@@ -61,7 +61,7 @@ bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
     DWORD output_buf;
     DWORD bytes_returned;
 
-    if (!DeviceIoControl(device_handle, CAPCOM_IOCTL, payload_ptr, CAPCOM_INPUT_BUF_SIZE, &output_buf, CAPCOM_OUTPUT_BUF_SIZE, &bytes_returned, nullptr))
+    if (!DeviceIoControl(device_handle, CAPCOM_IOCTL, &payload_ptr, CAPCOM_INPUT_BUF_SIZE, &output_buf, CAPCOM_OUTPUT_BUF_SIZE, &bytes_returned, nullptr))
     {
         LOG("[-] DeviceIoControl error %d", GetLastError());
 
