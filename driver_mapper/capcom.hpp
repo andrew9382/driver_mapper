@@ -1,0 +1,40 @@
+#pragma once
+
+#define CAPCOM_IOCTL_X86 0xAA012044
+#define CAPCOM_IOCTL_X64 0xAA013044
+
+#define CAPCOM_INPUT_BUF_SIZE_X86 4
+#define CAPCOM_INPUT_BUF_SIZE_X64 8
+
+#define CAPCOM_OUTPUT_BUF_SIZE 4
+
+#ifdef _WIN64
+#define CAPCOM_IOCTL CAPCOM_IOCTL_X64
+
+#define CAPCOM_INPUT_BUF_SIZE CAPCOM_INPUT_BUF_SIZE_X64
+#else
+#define CAPCOM_IOCTL CAPCOM_IOCTL_X86
+
+#define CAPCOM_INPUT_BUF_SIZE CAPCOM_INPUT_BUF_SIZE_X86
+#endif
+
+class CapcomControl
+{
+private:
+
+	std::wstring driver_name = L"capcom.sys";
+	std::wstring device_name = L"\\\\.\\Htsysm72FB";
+
+	HANDLE device_handle = nullptr;
+
+	std::filesystem::path driver_temp_path;
+
+public:
+
+	bool ExecuteUserFunction(void* p_func, void* param);
+
+	bool Load();
+
+	bool Unload();
+
+} inline capcom;
