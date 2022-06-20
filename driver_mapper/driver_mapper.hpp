@@ -2,5 +2,5 @@
 
 namespace driver_mapper
 {
-	void __stdcall PrintHelloWorldKernel(kernel::MmGetSystemRoutineAddress, PVOID param);
+	void __stdcall PrintHelloWorldKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress);
 }

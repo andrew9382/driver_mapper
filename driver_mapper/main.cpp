@@ -23,7 +23,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 	
-	capcom.ExecuteUserFunction(driver_mapper::PrintHelloWorldKernel, (void*)0x8888888888888888);
+	capcom.ExecuteUserFunction(driver_mapper::PrintHelloWorldKernel, nullptr);
 
 	if (!capcom.Unload())
 	{

