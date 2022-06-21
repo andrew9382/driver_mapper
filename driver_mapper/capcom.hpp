@@ -31,7 +31,7 @@ private:
 
 public:
 
-	bool ExecuteUserFunction(void* p_func, void* param);
+	bool ExecuteUserFunction(void* p_func, void* p_param);
 
 	bool Load();
 

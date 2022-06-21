@@ -53,7 +53,7 @@ bool service::RegisterAndStart(const std::filesystem::path& path_to_driver)
     nt_status = RtlAdjustPrivilege(nt::Privilege::SeLoadDriverPrivilege, TRUE, FALSE, &SeLoadDriverPrivilege_was_enabled);
     if (!NT_SUCCESS(nt_status))
     {
-        LOG("[-] RtlAdjustPrivilege error 0x%X", nt_status);
+        LOG("[-] RtlAdjustPrivilege error 0x%X, run file as administrator!", nt_status);
 
         return false;
     }

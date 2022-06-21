@@ -9,7 +9,9 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	if (std::filesystem::path(argv[1]).extension() != ".sys")
+	std::filesystem::path path_to_driver(argv[1]);
+
+	if (path_to_driver.extension() != ".sys")
 	{
 		PRINT_USAGE();
 
@@ -22,8 +24,13 @@ int main(int argc, char** argv)
 
 		return 1;
 	}
+
+	LOG("[+] capcom.sys loaded!");
 	
-	capcom.ExecuteUserFunction(driver_mapper::PrintHelloWorldKernel, nullptr);
+	if (!driver_mapper::LoadDriver(path_to_driver))
+	{
+		LOG("[-] Can't load your driver");
+	}
 
 	if (!capcom.Unload())
 	{
@@ -31,6 +38,8 @@ int main(int argc, char** argv)
 
 		return 1;
 	}
+
+	LOG("[+] capcom.sys unloaded!");
 
 	return 0;
 }
