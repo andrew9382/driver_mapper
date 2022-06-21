@@ -28,7 +28,7 @@ void __stdcall driver_mapper::shellcode_funcs::FreePool(kernel::MmGetSystemRouti
 
 	auto ExFreePool = (kernel::ExFreePool)MmGetSystemRoutineAddress(&ExFreePool_us);
 
-	ExFreePool(p_pool);
+	ExFreePool(*(void**)p_pool);
 }
 
 // for test
