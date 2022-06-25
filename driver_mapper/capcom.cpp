@@ -1,5 +1,85 @@
 #include "includes.hpp"
 
+bool CapcomControl::ClearMmUnloadedDrivers()
+{
+    void* buffer = nullptr;
+    ULONG buffer_size = 0;
+
+    NTSTATUS status = NtQuerySystemInformation((SYSTEM_INFORMATION_CLASS)nt::SystemExtendedHandleInformation, buffer, buffer_size, &buffer_size);
+
+    while (status == STATUS_INFO_LENGTH_MISMATCH)
+    {
+        if (buffer)
+        {
+            delete[] buffer;
+        }
+
+        buffer = new BYTE[buffer_size];
+
+        status = NtQuerySystemInformation((SYSTEM_INFORMATION_CLASS)nt::SystemExtendedHandleInformation, buffer, buffer_size, &buffer_size);
+    }
+
+    if (!NT_SUCCESS(status))
+    {
+        if (buffer)
+        {
+            delete[] buffer;
+        }
+
+        return false;
+    }
+
+    auto* handle_info = (nt::SYSTEM_HANDLE_INFORMATION_EX*)buffer;
+
+    ULONGLONG object = 0;
+
+    for (DWORD i = 0; i < handle_info->HandleCount; ++i)
+    {
+        if ((DWORD)handle_info->Handles[i].UniqueProcessId != GetCurrentProcessId())
+        {
+            continue;
+        }
+
+        if (handle_info->Handles[i].HandleValue == device_handle)
+        {
+            object = (ULONGLONG)handle_info->Handles[i].Object;
+
+            delete[] buffer;
+
+            break;
+        }
+    }
+
+    ULONGLONG device_object = 0;
+
+    driver_mapper::KernelCopyMemory((PVOID)(object + 0x8), &device_object, sizeof(device_object));
+
+    ULONGLONG driver_object = 0;
+
+    driver_mapper::KernelCopyMemory((PVOID)(device_object + 0x8), &driver_object, sizeof(driver_object));
+
+    ULONGLONG driver_section = 0;
+
+    driver_mapper::KernelCopyMemory((PVOID)(driver_object + 0x28), &driver_section, sizeof(driver_section));
+
+    UNICODE_STRING base_dll_name = { 0 };
+    UNICODE_STRING full_dll_name = { 0 };
+    
+    driver_mapper::KernelCopyMemory((PVOID)(driver_section + 0x58), &base_dll_name, sizeof(base_dll_name));
+    driver_mapper::KernelCopyMemory((PVOID)(driver_section + 0x48), &full_dll_name, sizeof(full_dll_name));
+
+    base_dll_name.Length = 0;
+    base_dll_name.MaximumLength = 0;
+
+    full_dll_name.Length = 0;
+    full_dll_name.MaximumLength = 0;
+
+    driver_mapper::KernelCopyMemory(&base_dll_name, (PVOID)(driver_section + 0x58), sizeof(base_dll_name));
+    driver_mapper::KernelCopyMemory(&full_dll_name, (PVOID)(driver_section + 0x48), sizeof(full_dll_name));
+
+    return true;
+}
+
 bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
 {
     if (!p_func || !device_handle)
@@ -134,6 +214,11 @@ bool CapcomControl::Unload()
 {
     LOG("[>] Unloading capcom.sys");
 
+    if (!ClearMmUnloadedDrivers())
+    {
+        LOG("[-] Can't clear MmUnloadedDrivers table");
+    }
+
     std::filesystem::path _driver_name(driver_name);
 
     CloseHandle(device_handle);
@@ -155,4 +240,9 @@ bool CapcomControl::Unload()
 
         return false;
     }
+}
+
+HANDLE CapcomControl::GetDeviceHandle()
+{
+    return device_handle;
 }

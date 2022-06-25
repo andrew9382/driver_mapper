@@ -44,7 +44,7 @@ void __stdcall driver_mapper::shellcode_funcs::MemsetInKernel(kernel::MmGetSyste
 	_memset((void*)memset_data->kernel_address, memset_data->value, memset_data->size);
 }
 
-void __stdcall driver_mapper::shellcode_funcs::WriteMemory(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_write_mem_data)
+void __stdcall driver_mapper::shellcode_funcs::_CopyMemory(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_write_mem_data)
 {
 	UNICODE_STRING RtlCopyMemory_us;
 
@@ -54,7 +54,7 @@ void __stdcall driver_mapper::shellcode_funcs::WriteMemory(kernel::MmGetSystemRo
 
 	auto* write_mem_data = (READ_WRITE_MEMORY_STRUCT*)p_write_mem_data;
 
-	_RtlCopyMemory((void*)write_mem_data->dst, (void*)write_mem_data->src, write_mem_data->size);
+	_RtlCopyMemory(write_mem_data->dst, write_mem_data->src, write_mem_data->size);
 }
 
 void __stdcall driver_mapper::shellcode_funcs::FindExportedRoutineByName(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_routine_data)
@@ -152,7 +152,7 @@ bool driver_mapper::MemsetInKernel(ULONGLONG kernel_addr, SIZE_T size, int value
 	return capcom.ExecuteUserFunction(shellcode_funcs::MemsetInKernel, &memset_data);
 }
 
-bool driver_mapper::WriteMemory(ULONGLONG src, ULONGLONG dst, SIZE_T size)
+bool driver_mapper::KernelCopyMemory(PVOID src, PVOID dst, SIZE_T size)
 {
 	READ_WRITE_MEMORY_STRUCT write_mem_data;
 
@@ -160,7 +160,7 @@ bool driver_mapper::WriteMemory(ULONGLONG src, ULONGLONG dst, SIZE_T size)
 	write_mem_data.dst = dst;
 	write_mem_data.size = size;
 
-	return capcom.ExecuteUserFunction(shellcode_funcs::WriteMemory, &write_mem_data);
+	return capcom.ExecuteUserFunction(shellcode_funcs::_CopyMemory, &write_mem_data);
 }
 
 bool driver_mapper::ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header, ULONGLONG delta)
@@ -214,6 +214,17 @@ bool driver_mapper::ResolveImports(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_
 
 		while (import_descriptor->Name)
 		{
+			char* module_name = (char*)(image_base + import_descriptor->Name);
+
+			ULONGLONG module_base = GetKernelModuleAddress(module_name);
+
+			if (!module_base)
+			{
+				LOG("[-] Can't get base address of '%s' module", module_name);
+
+				return false;
+			}
+
 			auto* p_thunk = (IMAGE_THUNK_DATA*)(image_base + import_descriptor->OriginalFirstThunk);
 			auto* p_func = (IMAGE_THUNK_DATA*)(image_base + import_descriptor->FirstThunk);
 
@@ -223,39 +234,20 @@ bool driver_mapper::ResolveImports(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_
 
 				char* func_name = (char*)imp_by_name->Name;
 
-				ANSI_STRING func_name_as;
+				if (!func_name)
+				{
+					LOG("[-] Can't get exported function name");
 
-				RtlInitAnsiString(&func_name_as, func_name);
+					return false;
+				}
 
-				UNICODE_STRING func_name_us;
-
-				RtlAnsiStringToUnicodeString(&func_name_us, &func_name_as, TRUE);
-
-				p_func->u1.Function = GetSystemRoutineAddress(func_name_us.Buffer);
-
-				RtlFreeUnicodeString(&func_name_us);
+				p_func->u1.Function = FindExportedRoutineByName(module_base, func_name);
 
 				if (!p_func->u1.Function)
 				{
-					char* module_name = (char*)(image_base + import_descriptor->Name);
+					LOG("[-] Can't get address of function: %s", func_name);
 
-					ULONGLONG module_base = GetKernelModuleAddress(module_name);
-
-					if (!module_base)
-					{
-						LOG("[-] Can't get base address of '%s' module", module_name);
-
-						return false;
-					}
-
-					p_func->u1.Function = FindExportedRoutineByName(module_base, func_name);
-
-					if (!p_func->u1.Function)
-					{
-						LOG("[-] Can't get address of function: %s", func_name);
-
-						return false;
-					}
+					return false;
 				}
 			}
 
@@ -444,7 +436,7 @@ bool driver_mapper::LoadDriver(std::filesystem::path& path_to_driver)
 
 	LOG("[>] Copying local image into kernel pool...");
 
-	if (!WriteMemory((ULONGLONG)local_image, kernel_image_base, opt_header->SizeOfImage))
+	if (!KernelCopyMemory(local_image, (PVOID)kernel_image_base, opt_header->SizeOfImage))
 	{
 		LOG("[-] Can't copy local image into kernel pool");
 

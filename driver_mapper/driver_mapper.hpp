@@ -33,8 +33,8 @@ namespace driver_mapper
 
 	struct READ_WRITE_MEMORY_STRUCT
 	{
-		ULONGLONG src;
-		ULONGLONG dst;
+		PVOID src;
+		PVOID dst;
 		SIZE_T size;
 	};
 
@@ -52,7 +52,8 @@ namespace driver_mapper
 	ULONGLONG FindExportedRoutineByName(ULONGLONG module_base, const char* routine_name);
 	bool FreePool(ULONGLONG pool_address);
 	bool MemsetInKernel(ULONGLONG kernel_addr, SIZE_T size, int value);
-	bool WriteMemory(ULONGLONG src, ULONGLONG dst, SIZE_T size);
+	bool KernelCopyMemory(PVOID src, PVOID dst, SIZE_T size);
+
 
 	bool ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header, ULONGLONG delta);
 	bool ResolveImports(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header);
@@ -65,7 +66,7 @@ namespace driver_mapper
 		void __stdcall AllocatePool(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_pool_data);
 		void __stdcall FreePool(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_pool);
 		void __stdcall MemsetInKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_memset_data);
-		void __stdcall WriteMemory(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_write_mem_data);
+		void __stdcall _CopyMemory(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_write_mem_data);
 		void __stdcall FindExportedRoutineByName(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_routine_data);
 
 		// for test

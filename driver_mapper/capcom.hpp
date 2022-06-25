@@ -29,6 +29,8 @@ private:
 
 	std::filesystem::path driver_temp_path;
 
+	bool ClearMmUnloadedDrivers();
+
 public:
 
 	bool ExecuteUserFunction(void* p_func, void* p_param);
@@ -36,5 +38,7 @@ public:
 	bool Load();
 
 	bool Unload();
+
+	HANDLE GetDeviceHandle();
 
 } inline capcom;
