@@ -39,6 +39,4 @@ public:
 
 	bool Unload();
 
-	HANDLE GetDeviceHandle();
-
 } inline capcom;

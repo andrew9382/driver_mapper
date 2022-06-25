@@ -241,8 +241,3 @@ bool CapcomControl::Unload()
         return false;
     }
 }
-
-HANDLE CapcomControl::GetDeviceHandle()
-{
-    return device_handle;
-}
