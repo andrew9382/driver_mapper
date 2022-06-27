@@ -9,8 +9,11 @@
 #define RELOC_FLAG RELOC_FLAG32
 #endif
 
+
 namespace driver_mapper
 {
+	using DriverEntry = NTSTATUS (__cdecl*) (PVOID p_driver_object, PVOID p_registry_path);
+
 	struct GET_ROUTINE_STRUCT
 	{
 		UNICODE_STRING routine_name;
@@ -45,6 +48,14 @@ namespace driver_mapper
 		ULONGLONG ret_address;
 	};
 
+	struct START_DRIVER_ENTRY_STRUCT
+	{
+		DriverEntry driver_entry;
+		PVOID p_driver_object;
+		PVOID p_registry_path;
+		NTSTATUS ret_status;
+	};
+
 	bool LoadDriver(std::filesystem::path& path_to_driver);
 
 	ULONGLONG GetSystemRoutineAddress(const wchar_t* routine_name);
@@ -53,7 +64,7 @@ namespace driver_mapper
 	bool FreePool(ULONGLONG pool_address);
 	bool MemsetInKernel(ULONGLONG kernel_addr, SIZE_T size, int value);
 	bool KernelCopyMemory(PVOID src, PVOID dst, SIZE_T size);
-
+	NTSTATUS StartDriverEntry(DriverEntry driver_entry, PVOID p_driver_object, PVOID p_registry_path);
 
 	bool ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header, ULONGLONG delta);
 	bool ResolveImports(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header);
@@ -68,6 +79,7 @@ namespace driver_mapper
 		void __stdcall MemsetInKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_memset_data);
 		void __stdcall _CopyMemory(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_write_mem_data);
 		void __stdcall FindExportedRoutineByName(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_routine_data);
+		void __stdcall StartDriverEntry(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_driver_entry_data);
 
 		// for test
 		//void __stdcall PrintHelloWorldKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress);

@@ -70,6 +70,13 @@ void __stdcall driver_mapper::shellcode_funcs::FindExportedRoutineByName(kernel:
 	routine_data->ret_address = (ULONGLONG)RtlFindExportedRoutineByName(routine_data->module_base, routine_data->name);
 }
 
+void __stdcall driver_mapper::shellcode_funcs::StartDriverEntry(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_driver_entry_data)
+{
+	auto* driver_entry_data = (START_DRIVER_ENTRY_STRUCT*)p_driver_entry_data;
+
+	driver_entry_data->ret_status = driver_entry_data->driver_entry(driver_entry_data->p_driver_object, driver_entry_data->p_registry_path);
+}
+
 // for test
 /*void __stdcall driver_mapper::shellcode_funcs::PrintHelloWorldKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
 {
@@ -163,6 +170,19 @@ bool driver_mapper::KernelCopyMemory(PVOID src, PVOID dst, SIZE_T size)
 	return capcom.ExecuteUserFunction(shellcode_funcs::_CopyMemory, &write_mem_data);
 }
 
+NTSTATUS driver_mapper::StartDriverEntry(DriverEntry driver_entry, PVOID p_driver_object, PVOID p_registry_path)
+{
+	START_DRIVER_ENTRY_STRUCT driver_entry_data;
+
+	driver_entry_data.driver_entry = driver_entry;
+	driver_entry_data.p_driver_object = p_driver_object;
+	driver_entry_data.p_registry_path = p_registry_path;
+
+	capcom.ExecuteUserFunction(StartDriverEntry, &driver_entry_data);
+	
+	return driver_entry_data.ret_status;
+}
+
 bool driver_mapper::ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header, ULONGLONG delta)
 {
 	if (!image_base || !opt_header)
@@ -180,7 +200,7 @@ bool driver_mapper::ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER
 		return false;
 	}
 
-	auto reloc_data = (IMAGE_BASE_RELOCATION*)(image_base + opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
+	auto* reloc_data = (IMAGE_BASE_RELOCATION*)(image_base + opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
 	while (reloc_data->VirtualAddress)
 	{
 		DWORD amount_of_entries = (reloc_data->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
@@ -230,16 +250,16 @@ bool driver_mapper::ResolveImports(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_
 
 			for (; p_thunk->u1.AddressOfData; ++p_thunk, ++p_func)
 			{
-				auto* imp_by_name = (IMAGE_IMPORT_BY_NAME*)(image_base + p_thunk->u1.AddressOfData);
-
-				char* func_name = (char*)imp_by_name->Name;
-
-				if (!func_name)
+				if (IMAGE_SNAP_BY_ORDINAL(p_thunk->u1.Ordinal))
 				{
 					LOG("[-] Can't get exported function name");
 
 					return false;
 				}
+
+				auto* imp_by_name = (IMAGE_IMPORT_BY_NAME*)(image_base + p_thunk->u1.AddressOfData);
+
+				char* func_name = (char*)imp_by_name->Name;
 
 				p_func->u1.Function = FindExportedRoutineByName(module_base, func_name);
 
@@ -449,6 +469,21 @@ bool driver_mapper::LoadDriver(std::filesystem::path& path_to_driver)
 
 	LOG("[+] Local image copied into kernel pool!");
 
+	DriverEntry driver_entry = (DriverEntry)(kernel_image_base + opt_header->AddressOfEntryPoint);
+
+	if (!NT_SUCCESS(StartDriverEntry(driver_entry, (PVOID)kernel_image_base, (PVOID)kernel_image_base)))
+	{
+		LOG("[-] Can't execute driver entry");
+		
+		VirtualFree(local_image, 0, MEM_RELEASE);
+
+		FreePool(kernel_image_base);
+
+		return false;
+	}
+
+	LOG("[+] Driver entry executed!");
+
 	LOG("[>] Erasing headers...");
 
 	if (!MemsetInKernel(kernel_image_base, opt_header->SizeOfHeaders, 0))
@@ -461,10 +496,10 @@ bool driver_mapper::LoadDriver(std::filesystem::path& path_to_driver)
 
 		return false;
 	}
-	
-	LOG("[+] Headers erased!");
 
-	FreePool(kernel_image_base); // temporary
+	LOG("[+] Headers erased!");
+	
+	VirtualFree(local_image, 0, MEM_RELEASE);
 
 	return true;
 }

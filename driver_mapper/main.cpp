@@ -31,6 +31,10 @@ int main(int argc, char** argv)
 	{
 		LOG("[-] Can't load your driver");
 	}
+	else
+	{
+		LOG("[+] Your driver loaded!");
+	}
 
 	if (!capcom.Unload())
 	{
