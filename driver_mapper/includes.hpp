@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <functional>
 #include <winternl.h>
 #include "nt.hpp"
 #include "defines.hpp"

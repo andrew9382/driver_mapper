@@ -9,52 +9,9 @@
 #define RELOC_FLAG RELOC_FLAG32
 #endif
 
-
 namespace driver_mapper
 {
 	using DriverEntry = NTSTATUS (__cdecl*) (PVOID p_driver_object, PVOID p_registry_path);
-
-	struct GET_ROUTINE_STRUCT
-	{
-		UNICODE_STRING routine_name;
-		ULONGLONG ret_address;
-	};
-
-	struct ALLOCATE_POOL_STRUCT
-	{
-		kernel::POOL_TYPE pool_type;
-		SIZE_T size;
-		ULONGLONG ret_address;
-	};
-
-	struct MEMSET_IN_KERNEL_STRUCT
-	{
-		SIZE_T size;
-		int value;
-		ULONGLONG kernel_address;
-	};
-
-	struct READ_WRITE_MEMORY_STRUCT
-	{
-		PVOID src;
-		PVOID dst;
-		SIZE_T size;
-	};
-
-	struct FIND_EXPORTED_ROUTINE_BY_NAME_STRUCT
-	{
-		char name[MAX_PATH];
-		PVOID module_base;
-		ULONGLONG ret_address;
-	};
-
-	struct START_DRIVER_ENTRY_STRUCT
-	{
-		DriverEntry driver_entry;
-		PVOID p_driver_object;
-		PVOID p_registry_path;
-		NTSTATUS ret_status;
-	};
 
 	bool LoadDriver(std::filesystem::path& path_to_driver);
 
@@ -70,18 +27,4 @@ namespace driver_mapper
 	bool ResolveImports(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header);
 
 	ULONGLONG GetKernelModuleAddress(const char* module_name);
-
-	namespace shellcode_funcs
-	{
-		void __stdcall GetSystemRoutineAddress(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_routine_data);
-		void __stdcall AllocatePool(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_pool_data);
-		void __stdcall FreePool(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_pool);
-		void __stdcall MemsetInKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_memset_data);
-		void __stdcall _CopyMemory(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_write_mem_data);
-		void __stdcall FindExportedRoutineByName(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_routine_data);
-		void __stdcall StartDriverEntry(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_driver_entry_data);
-
-		// for test
-		//void __stdcall PrintHelloWorldKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress);
-	}
 }

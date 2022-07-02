@@ -1,94 +1,5 @@
 #include "includes.hpp"
 
-void __stdcall driver_mapper::shellcode_funcs::GetSystemRoutineAddress(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_routine_data)
-{
-	auto* routine_data = (GET_ROUTINE_STRUCT*)p_routine_data;
-
-	routine_data->ret_address = (ULONGLONG)MmGetSystemRoutineAddress(&routine_data->routine_name);
-}
-
-void __stdcall driver_mapper::shellcode_funcs::AllocatePool(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_pool_data)
-{
-	UNICODE_STRING ExAllocatePool_us;
-
-	RtlInitUnicodeString(&ExAllocatePool_us, L"ExAllocatePool");
-	
-	auto ExAllocatePool = (kernel::ExAllocatePool)MmGetSystemRoutineAddress(&ExAllocatePool_us);
-
-	auto* pool_struct = (ALLOCATE_POOL_STRUCT*)p_pool_data;
-
-	pool_struct->ret_address = (ULONGLONG)ExAllocatePool(pool_struct->pool_type, pool_struct->size);
-}
-
-void __stdcall driver_mapper::shellcode_funcs::FreePool(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_pool)
-{
-	UNICODE_STRING ExFreePool_us;
-
-	RtlInitUnicodeString(&ExFreePool_us, L"ExFreePool");
-
-	auto ExFreePool = (kernel::ExFreePool)MmGetSystemRoutineAddress(&ExFreePool_us);
-
-	ExFreePool(*(void**)p_pool);
-}
-
-void __stdcall driver_mapper::shellcode_funcs::MemsetInKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_memset_data)
-{
-	UNICODE_STRING memset_us;
-
-	RtlInitUnicodeString(&memset_us, L"memset");
-	
-	auto _memset = (decltype(memset)*)MmGetSystemRoutineAddress(&memset_us);
-
-	auto memset_data = (MEMSET_IN_KERNEL_STRUCT*)p_memset_data;
-
-	_memset((void*)memset_data->kernel_address, memset_data->value, memset_data->size);
-}
-
-void __stdcall driver_mapper::shellcode_funcs::_CopyMemory(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_write_mem_data)
-{
-	UNICODE_STRING RtlCopyMemory_us;
-
-	RtlInitUnicodeString(&RtlCopyMemory_us, L"RtlCopyMemory");
-
-	auto _RtlCopyMemory = (kernel::RtlCopyMemory)MmGetSystemRoutineAddress(&RtlCopyMemory_us);
-
-	auto* write_mem_data = (READ_WRITE_MEMORY_STRUCT*)p_write_mem_data;
-
-	_RtlCopyMemory(write_mem_data->dst, write_mem_data->src, write_mem_data->size);
-}
-
-void __stdcall driver_mapper::shellcode_funcs::FindExportedRoutineByName(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_routine_data)
-{
-	UNICODE_STRING RtlFindExportedRoutineByName_us;
-
-	RtlInitUnicodeString(&RtlFindExportedRoutineByName_us, L"RtlFindExportedRoutineByName");
-
-	auto RtlFindExportedRoutineByName = (kernel::RtlFindExportedRoutineByName)MmGetSystemRoutineAddress(&RtlFindExportedRoutineByName_us);
-
-	auto* routine_data = (FIND_EXPORTED_ROUTINE_BY_NAME_STRUCT*)p_routine_data;
-
-	routine_data->ret_address = (ULONGLONG)RtlFindExportedRoutineByName(routine_data->module_base, routine_data->name);
-}
-
-void __stdcall driver_mapper::shellcode_funcs::StartDriverEntry(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress, PVOID p_driver_entry_data)
-{
-	auto* driver_entry_data = (START_DRIVER_ENTRY_STRUCT*)p_driver_entry_data;
-
-	driver_entry_data->ret_status = driver_entry_data->driver_entry(driver_entry_data->p_driver_object, driver_entry_data->p_registry_path);
-}
-
-// for test
-/*void __stdcall driver_mapper::shellcode_funcs::PrintHelloWorldKernel(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
-{
-	UNICODE_STRING us;
-
-	RtlInitUnicodeString(&us, L"DbgPrintEx");
-
-	kernel::DbgPrintEx DbgPrintEx = (kernel::DbgPrintEx)MmGetSystemRoutineAddress(&us);
-
-	DbgPrintEx(0, 0, "Hello World!\n");
-}*/
-
 ULONGLONG driver_mapper::GetSystemRoutineAddress(const wchar_t* routine_name)
 {
 	if (!routine_name)
@@ -96,31 +7,44 @@ ULONGLONG driver_mapper::GetSystemRoutineAddress(const wchar_t* routine_name)
 		return 0;
 	}
 	
-	GET_ROUTINE_STRUCT routine_data;
+	ULONGLONG ret_address = 0;
 
-	RtlInitUnicodeString(&routine_data.routine_name, routine_name);
+	UNICODE_STRING us_name;
 
-	if (!capcom.ExecuteUserFunction(shellcode_funcs::GetSystemRoutineAddress, &routine_data))
+	RtlInitUnicodeString(&us_name, routine_name);
+
+	if (!capcom.ExecuteUserFunction([&](kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
+		{
+			ret_address = (ULONGLONG)MmGetSystemRoutineAddress(&us_name);
+
+		}, nullptr))
 	{
 		return 0;
 	}
 
-	return routine_data.ret_address;
+	return ret_address;
 }
 
 ULONGLONG driver_mapper::AllocatePool(kernel::POOL_TYPE pool_type, SIZE_T size)
 {
-	ALLOCATE_POOL_STRUCT pool;
+	ULONGLONG ret_address = 0;
 
-	pool.pool_type = pool_type;
-	pool.size = size;
+	UNICODE_STRING ExAllocatePool_us;
 
-	if (!capcom.ExecuteUserFunction(shellcode_funcs::AllocatePool, &pool))
+	RtlInitUnicodeString(&ExAllocatePool_us, L"ExAllocatePool");
+
+	if (!capcom.ExecuteUserFunction([&](kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
+		{
+			auto ExAllocatePool = (kernel::ExAllocatePool)MmGetSystemRoutineAddress(&ExAllocatePool_us);
+
+			ret_address = (ULONGLONG)ExAllocatePool(pool_type, size);
+
+		}, nullptr))
 	{
 		return 0;
 	}
 
-	return pool.ret_address;
+	return ret_address;
 }
 
 ULONGLONG driver_mapper::FindExportedRoutineByName(ULONGLONG module_base, const char* routine_name)
@@ -130,57 +54,82 @@ ULONGLONG driver_mapper::FindExportedRoutineByName(ULONGLONG module_base, const 
 		return 0;
 	}
 	
-	FIND_EXPORTED_ROUTINE_BY_NAME_STRUCT routine_data;
+	ULONGLONG ret_address;
 
-	routine_data.module_base = (PVOID)module_base;
-	strcpy_s(routine_data.name, routine_name);
+	UNICODE_STRING RtlFindExportedRoutineByName_us;
 
-	if (!capcom.ExecuteUserFunction(shellcode_funcs::FindExportedRoutineByName, &routine_data))
+	RtlInitUnicodeString(&RtlFindExportedRoutineByName_us, L"RtlFindExportedRoutineByName");
+
+	if (!capcom.ExecuteUserFunction([&](kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
+		{
+			auto RtlFindExportedRoutineByName = (kernel::RtlFindExportedRoutineByName)MmGetSystemRoutineAddress(&RtlFindExportedRoutineByName_us);
+
+			ret_address = (ULONGLONG)RtlFindExportedRoutineByName((PVOID)module_base, (PCHAR)routine_name);
+
+		}, nullptr))
 	{
 		return 0;
 	}
 
-	return routine_data.ret_address;
+	return ret_address;
 }
 
 bool driver_mapper::FreePool(ULONGLONG pool_address)
 {
-	return capcom.ExecuteUserFunction(shellcode_funcs::FreePool, &pool_address);
+	UNICODE_STRING ExFreePool_us;
+
+	RtlInitUnicodeString(&ExFreePool_us, L"ExFreePool");
+
+	return capcom.ExecuteUserFunction([&](kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
+		{
+			auto ExFreePool = (kernel::ExFreePool)MmGetSystemRoutineAddress(&ExFreePool_us);
+
+			ExFreePool((PVOID)pool_address);
+		
+		}, nullptr);
 }
 
 bool driver_mapper::MemsetInKernel(ULONGLONG kernel_addr, SIZE_T size, int value)
 {
-	MEMSET_IN_KERNEL_STRUCT memset_data;
+	UNICODE_STRING memset_us;
 
-	memset_data.kernel_address = kernel_addr;
-	memset_data.size = size;
-	memset_data.value = value;
+	RtlInitUnicodeString(&memset_us, L"memset");
+	
+	return capcom.ExecuteUserFunction([&](kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
+		{
+			auto _memset = (decltype(memset)*)MmGetSystemRoutineAddress(&memset_us);
 
-	return capcom.ExecuteUserFunction(shellcode_funcs::MemsetInKernel, &memset_data);
+			_memset((PVOID)kernel_addr, value, size);
+
+		}, nullptr);
 }
 
 bool driver_mapper::KernelCopyMemory(PVOID src, PVOID dst, SIZE_T size)
 {
-	READ_WRITE_MEMORY_STRUCT write_mem_data;
+	UNICODE_STRING RtlCopyMemory_us;
 
-	write_mem_data.src = src;
-	write_mem_data.dst = dst;
-	write_mem_data.size = size;
+	RtlInitUnicodeString(&RtlCopyMemory_us, L"RtlCopyMemory");
 
-	return capcom.ExecuteUserFunction(shellcode_funcs::_CopyMemory, &write_mem_data);
+	return capcom.ExecuteUserFunction([&](kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
+		{
+			auto _RtlCopyMemory = (kernel::RtlCopyMemory)MmGetSystemRoutineAddress(&RtlCopyMemory_us);
+
+			_RtlCopyMemory(dst, src, size);
+
+		}, nullptr);
 }
 
 NTSTATUS driver_mapper::StartDriverEntry(DriverEntry driver_entry, PVOID p_driver_object, PVOID p_registry_path)
 {
-	START_DRIVER_ENTRY_STRUCT driver_entry_data;
+	NTSTATUS ret_status;
 
-	driver_entry_data.driver_entry = driver_entry;
-	driver_entry_data.p_driver_object = p_driver_object;
-	driver_entry_data.p_registry_path = p_registry_path;
+	capcom.ExecuteUserFunction([&](kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
+		{
+			ret_status = driver_entry(p_driver_object, p_registry_path);
 
-	capcom.ExecuteUserFunction(StartDriverEntry, &driver_entry_data);
+		}, nullptr);
 	
-	return driver_entry_data.ret_status;
+	return ret_status;
 }
 
 bool driver_mapper::ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_header, ULONGLONG delta)
@@ -204,7 +153,7 @@ bool driver_mapper::ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER
 	while (reloc_data->VirtualAddress)
 	{
 		DWORD amount_of_entries = (reloc_data->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
-		WORD* relative_info = (WORD*)reloc_data + 1;
+		WORD* relative_info = (WORD*)(reloc_data + 1);
 
 		for (DWORD i = 0; i < amount_of_entries; ++i, ++relative_info)
 		{
@@ -230,7 +179,7 @@ bool driver_mapper::ResolveImports(BYTE* image_base, IMAGE_OPTIONAL_HEADER* opt_
 
 	if (opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
 	{
-		auto import_descriptor = (IMAGE_IMPORT_DESCRIPTOR*)(image_base + opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+		auto* import_descriptor = (IMAGE_IMPORT_DESCRIPTOR*)(image_base + opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 
 		while (import_descriptor->Name)
 		{
@@ -468,6 +417,9 @@ bool driver_mapper::LoadDriver(std::filesystem::path& path_to_driver)
 	}
 
 	LOG("[+] Local image copied into kernel pool!");
+
+	void* temp = VirtualAlloc(0, opt_header->SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	KernelCopyMemory((PVOID)kernel_image_base, temp, opt_header->SizeOfImage);
 
 	DriverEntry driver_entry = (DriverEntry)(kernel_image_base + opt_header->AddressOfEntryPoint);
 

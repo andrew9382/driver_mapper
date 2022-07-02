@@ -80,7 +80,7 @@ bool CapcomControl::ClearMmUnloadedDrivers()
     return true;
 }
 
-bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
+bool CapcomControl::ExecuteUserFunction(user_function p_func, void* p_param)
 {
     if (!p_func || !device_handle)
     { 
@@ -113,7 +113,7 @@ bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
         memcpy(payload_ptr, payload_template, sizeof(payload_template));
 
         *(DWORD64*)payload_ptr = (DWORD64)(payload_ptr + 8);
-        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func;
+        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func.target<user_function>();
         *(DWORD64*)(payload_ptr + 23) = (DWORD64)p_param;
     }
     else
@@ -139,7 +139,7 @@ bool CapcomControl::ExecuteUserFunction(void* p_func, void* p_param)
         memcpy(payload_ptr, payload_template, sizeof(payload_template));
 
         *(DWORD64*)payload_ptr = (DWORD64)(payload_ptr + 8);
-        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func;
+        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func.target<user_function>();
     }
 
     DWORD output_buf;

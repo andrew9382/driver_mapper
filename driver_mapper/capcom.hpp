@@ -22,6 +22,8 @@ class CapcomControl
 {
 private:
 
+	using user_function = std::function<void(kernel::MmGetSystemRoutineAddress)>;
+
 	std::wstring driver_name = L"capcom.sys";
 	std::wstring device_name = L"\\\\.\\Htsysm72FB";
 
@@ -33,7 +35,7 @@ private:
 
 public:
 
-	bool ExecuteUserFunction(void* p_func, void* p_param);
+	bool ExecuteUserFunction(user_function p_func, void* p_param);
 
 	bool Load();
 
