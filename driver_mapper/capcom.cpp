@@ -1,8 +1,8 @@
 #include "includes.hpp"
 
-void CapcomDispatcher(kernel::MmGetSystemRoutineAddress mm_get_system_routine_address)
+void CapcomDispatcher(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress)
 {
-    (*g_user_function)(mm_get_system_routine_address);
+    (*g_user_function)(MmGetSystemRoutineAddress);
 }
 
 bool CapcomControl::ClearMmUnloadedDrivers()

@@ -22,7 +22,7 @@ using user_function = std::function<void(kernel::MmGetSystemRoutineAddress)>;
 
 inline user_function* g_user_function = nullptr;
 
-void CapcomDispatcher(kernel::MmGetSystemRoutineAddress mm_get_system_routine_address);
+void CapcomDispatcher(kernel::MmGetSystemRoutineAddress MmGetSystemRoutineAddress);
 
 class CapcomControl
 {
