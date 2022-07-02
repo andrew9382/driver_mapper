@@ -18,11 +18,15 @@
 #define CAPCOM_INPUT_BUF_SIZE CAPCOM_INPUT_BUF_SIZE_X86
 #endif
 
+using user_function = std::function<void(kernel::MmGetSystemRoutineAddress)>;
+
+inline user_function* g_user_function = nullptr;
+
+void CapcomDispatcher(kernel::MmGetSystemRoutineAddress mm_get_system_routine_address);
+
 class CapcomControl
 {
 private:
-
-	using user_function = std::function<void(kernel::MmGetSystemRoutineAddress)>;
 
 	std::wstring driver_name = L"capcom.sys";
 	std::wstring device_name = L"\\\\.\\Htsysm72FB";
@@ -35,7 +39,7 @@ private:
 
 public:
 
-	bool ExecuteUserFunction(user_function p_func, void* p_param);
+	bool ExecuteUserFunction(user_function p_func);
 
 	bool Load();
 

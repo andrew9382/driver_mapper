@@ -17,7 +17,7 @@ ULONGLONG driver_mapper::GetSystemRoutineAddress(const wchar_t* routine_name)
 		{
 			ret_address = (ULONGLONG)MmGetSystemRoutineAddress(&us_name);
 
-		}, nullptr))
+		}))
 	{
 		return 0;
 	}
@@ -39,7 +39,7 @@ ULONGLONG driver_mapper::AllocatePool(kernel::POOL_TYPE pool_type, SIZE_T size)
 
 			ret_address = (ULONGLONG)ExAllocatePool(pool_type, size);
 
-		}, nullptr))
+		}))
 	{
 		return 0;
 	}
@@ -66,7 +66,7 @@ ULONGLONG driver_mapper::FindExportedRoutineByName(ULONGLONG module_base, const 
 
 			ret_address = (ULONGLONG)RtlFindExportedRoutineByName((PVOID)module_base, (PCHAR)routine_name);
 
-		}, nullptr))
+		}))
 	{
 		return 0;
 	}
@@ -86,7 +86,7 @@ bool driver_mapper::FreePool(ULONGLONG pool_address)
 
 			ExFreePool((PVOID)pool_address);
 		
-		}, nullptr);
+		});
 }
 
 bool driver_mapper::MemsetInKernel(ULONGLONG kernel_addr, SIZE_T size, int value)
@@ -101,7 +101,7 @@ bool driver_mapper::MemsetInKernel(ULONGLONG kernel_addr, SIZE_T size, int value
 
 			_memset((PVOID)kernel_addr, value, size);
 
-		}, nullptr);
+		});
 }
 
 bool driver_mapper::KernelCopyMemory(PVOID src, PVOID dst, SIZE_T size)
@@ -116,7 +116,7 @@ bool driver_mapper::KernelCopyMemory(PVOID src, PVOID dst, SIZE_T size)
 
 			_RtlCopyMemory(dst, src, size);
 
-		}, nullptr);
+		});
 }
 
 NTSTATUS driver_mapper::StartDriverEntry(DriverEntry driver_entry, PVOID p_driver_object, PVOID p_registry_path)
@@ -127,7 +127,7 @@ NTSTATUS driver_mapper::StartDriverEntry(DriverEntry driver_entry, PVOID p_drive
 		{
 			ret_status = driver_entry(p_driver_object, p_registry_path);
 
-		}, nullptr);
+		});
 	
 	return ret_status;
 }

