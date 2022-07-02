@@ -144,27 +144,26 @@ bool driver_mapper::ResolveRelocsByDelta(BYTE* image_base, IMAGE_OPTIONAL_HEADER
 		return true;
 	}
 
-	if (!opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size)
+	if (opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size)
 	{
-		return false;
-	}
-
-	auto* reloc_data = (IMAGE_BASE_RELOCATION*)(image_base + opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
-	while (reloc_data->VirtualAddress)
-	{
-		DWORD amount_of_entries = (reloc_data->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
-		WORD* relative_info = (WORD*)(reloc_data + 1);
-
-		for (DWORD i = 0; i < amount_of_entries; ++i, ++relative_info)
+		auto* reloc_data = (IMAGE_BASE_RELOCATION*)(image_base + opt_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress);
+		
+		while (reloc_data->VirtualAddress)
 		{
-			if (RELOC_FLAG(*relative_info))
-			{
-				ULONG_PTR* patch = (ULONG_PTR*)(image_base + reloc_data->VirtualAddress + (*relative_info & 0xFFF));
-				*patch += delta;
-			}
-		}
+			DWORD amount_of_entries = (reloc_data->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
+			WORD* relative_info = (WORD*)(reloc_data + 1);
 
-		reloc_data = (IMAGE_BASE_RELOCATION*)((BYTE*)reloc_data + reloc_data->SizeOfBlock);
+			for (DWORD i = 0; i < amount_of_entries; ++i, ++relative_info)
+			{
+				if (RELOC_FLAG(*relative_info))
+				{
+					ULONG_PTR* patch = (ULONG_PTR*)(image_base + reloc_data->VirtualAddress + (*relative_info & 0xFFF));
+					*patch += delta;
+				}
+			}
+
+			reloc_data = (IMAGE_BASE_RELOCATION*)((BYTE*)reloc_data + reloc_data->SizeOfBlock);
+		}
 	}
 
 	return true;
@@ -417,9 +416,6 @@ bool driver_mapper::LoadDriver(std::filesystem::path& path_to_driver)
 	}
 
 	LOG("[+] Local image copied into kernel pool!");
-
-	void* temp = VirtualAlloc(0, opt_header->SizeOfImage, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	KernelCopyMemory((PVOID)kernel_image_base, temp, opt_header->SizeOfImage);
 
 	DriverEntry driver_entry = (DriverEntry)(kernel_image_base + opt_header->AddressOfEntryPoint);
 
