@@ -34,17 +34,19 @@ bool tools::MapFileToMemory(std::filesystem::path& path_to_file, BYTE** out_buff
         return false;
     }
 
-    size_t size_of_file = std::filesystem::file_size(path_to_file);
-
-    if (!size_of_file || size_of_file < PAGE_SIZE)
-    {
-        return false;
-    }
-
     std::fstream file(path_to_file, std::ios::in | std::ios::binary);
    
     if (!file.good())
     {
+        return false;
+    }
+
+    size_t size_of_file = std::filesystem::file_size(path_to_file);
+
+    if (!size_of_file || size_of_file < PAGE_SIZE)
+    {
+        file.close();
+
         return false;
     }
 
