@@ -419,7 +419,7 @@ bool driver_mapper::LoadDriver(std::filesystem::path& path_to_driver)
 
 	DriverEntry driver_entry = (DriverEntry)(kernel_image_base + opt_header->AddressOfEntryPoint);
 
-	if (!NT_SUCCESS(StartDriverEntry(driver_entry, (PVOID)kernel_image_base, (PVOID)kernel_image_base)))
+	if (!NT_SUCCESS(StartDriverEntry(driver_entry, 0, (PVOID)kernel_image_base)))
 	{
 		LOG("[-] Can't execute driver entry");
 		
